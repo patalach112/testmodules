@@ -1,0 +1,16 @@
+# Build artifacts
+**/build/
+*.o
+*.so
+*.so.*
+*.d
+*.a
+
+# Local environment / editor noise
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+*.swp
+*~

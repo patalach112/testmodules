@@ -1,0 +1,11 @@
+.git
+.gitignore
+**/build
+*.o
+*.so
+*.d
+.env
+.env.*
+README.md
+.vscode
+.idea
