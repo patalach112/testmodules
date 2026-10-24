@@ -26,10 +26,11 @@ LIB_LINK   := lib$(LIB_NAME).so
 BUILD_DIR  := build
 OBJ        := $(BUILD_DIR)/asm_crypto.o
 DEP        := $(OBJ:.o=.d)
+TEST_BIN   := $(BUILD_DIR)/asm_crypto_test
 
 PREFIX     ?= /usr/local
 
-.PHONY: all clean install
+.PHONY: all clean install check
 
 all: $(BUILD_DIR)/$(LIB_FILE)
 
@@ -53,5 +54,11 @@ install: all
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+# Link the test against the object directly, so it needs neither the
+# shared library nor an rpath/loader configuration.
+check: $(OBJ) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/asm_crypto_test.c $(OBJ) -o $(TEST_BIN)
+	./$(TEST_BIN)
 
 -include $(DEP)
