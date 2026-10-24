@@ -6,6 +6,7 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/dispatch.hpp>
 #include <chrono>
+#include <functional>
 #include <string>
 #include <utility>
 
@@ -24,8 +25,7 @@ void Session::run()
 {
     // Hop onto the socket's strand so the whole session is serialized.
     net::dispatch(ws_.get_executor(),
-                  beast::bind_front_handler(&Session::accept,
-                                            shared_from_this()));
+                  std::bind_front(&Session::accept, shared_from_this()));
 }
 
 void Session::accept()
@@ -37,8 +37,8 @@ void Session::accept()
     // Reads the buffered HTTP Upgrade request and replies with HTTP 101.
     // Cloudflare already validated the edge TLS certificate; here we only
     // speak the WebSocket subprotocol (RFC 6455) over plain TCP.
-    ws_.async_accept(beast::bind_front_handler(&Session::on_accept,
-                                               shared_from_this()));
+    ws_.async_accept(
+        std::bind_front(&Session::on_accept, shared_from_this()));
 }
 
 void Session::on_accept(beast::error_code ec)
@@ -57,8 +57,8 @@ void Session::on_accept(beast::error_code ec)
 void Session::read()
 {
     // Client frames arrive masked; Beast unmasks them into rx_ transparently.
-    ws_.async_read(rx_, beast::bind_front_handler(&Session::on_read,
-                                                  shared_from_this()));
+    ws_.async_read(rx_,
+                   std::bind_front(&Session::on_read, shared_from_this()));
 }
 
 void Session::on_read(beast::error_code ec, std::size_t /*bytes*/)
@@ -81,8 +81,7 @@ void Session::on_read(beast::error_code ec, std::size_t /*bytes*/)
     // Echo in the same opcode class the client used (text or binary).
     ws_.binary(ws_.got_binary());
     ws_.async_write(net::buffer(tx_),
-                    beast::bind_front_handler(&Session::on_write,
-                                              shared_from_this()));
+                    std::bind_front(&Session::on_write, shared_from_this()));
 }
 
 void Session::on_write(beast::error_code ec, std::size_t bytes)
