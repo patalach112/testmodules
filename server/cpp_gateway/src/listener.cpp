@@ -4,6 +4,7 @@
 #include "gateway/session.hpp"
 
 #include <boost/asio/strand.hpp>
+#include <functional>
 #include <stdexcept>
 #include <utility>
 
@@ -49,8 +50,8 @@ void Listener::do_accept()
     // serialized execution path independent of every other connection.
     acceptor_.async_accept(
         net::make_strand(ioc_),
-        beast::bind_front_handler(&Listener::on_accept,
-                                  shared_from_this()));
+        std::bind_front(&Listener::on_accept,
+                        shared_from_this()));
 }
 
 void Listener::on_accept(beast::error_code ec, tcp::socket socket)

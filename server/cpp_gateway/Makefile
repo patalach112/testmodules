@@ -1,5 +1,16 @@
 #
-# Build rules for the WebSocket gateway.
+# Platform dispatcher.
+#
+# MSYS2/MINGW64 exports OS=Windows_NT, in which case the native Windows
+# rules (static object linking, ws2_32/mswsock) take over automatically so
+# that `make clean && make` produces build/gateway.exe without extra flags.
+#
+ifeq ($(OS),Windows_NT)
+include Makefile.win
+else
+
+#
+# Linux build rules for the WebSocket gateway.
 #
 # The binary links against libasm_crypto.so from ../c_asm_crypto. The shared
 # library is copied next to the binary so the $ORIGIN runpath resolves it
@@ -48,3 +59,5 @@ clean:
 	$(MAKE) -C ../c_asm_crypto clean
 
 -include $(DEP)
+
+endif

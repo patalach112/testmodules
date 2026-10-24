@@ -29,6 +29,8 @@ the gateway publishes no host ports.
 ├── Dockerfile                 multi-stage Debian 13 (trixie) image
 ├── docker-compose.yml         gateway service + optional cloudflared profile
 ├── Makefile                   repository-wide build/test entry points
+├── scripts/
+│   └── build-windows.sh       MinGW64/MSYS2 convenience wrapper
 └── server/
     ├── c_asm_crypto/          C11 core library with x86-64 inline assembly
     │   ├── include/asm_crypto.h
@@ -37,7 +39,8 @@ the gateway publishes no host ports.
     └── cpp_gateway/           C++20 WebSocket gateway
         ├── include/gateway/   config, logger, session, listener
         ├── src/               implementation + main()
-        └── Makefile           links libasm_crypto.so, RUNPATH $ORIGIN
+        ├── Makefile           Linux: links libasm_crypto.so, RUNPATH $ORIGIN
+        └── Makefile.win       Windows: static object + ws2_32/mswsock
 ```
 
 ## Prerequisites
@@ -98,6 +101,47 @@ Connected (press CTRL+C to quit)
 
 Malformed values make the process fail fast with an explanatory `fatal:`
 message.
+
+## Native Windows build (MinGW64 / MSYS2)
+
+The same sources compile to a native `gateway.exe` inside an **MINGW64**
+terminal. Install the toolchain once:
+
+```sh
+pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-boost make
+```
+
+Then build from the repository root or from `server/cpp_gateway`:
+
+```sh
+# either, via the wrapper script
+./scripts/build-windows.sh
+
+# or directly — MSYS2 exports OS=Windows_NT, so Makefile includes
+# Makefile.win automatically
+cd server/cpp_gateway
+make clean && make
+```
+
+Output: `server/cpp_gateway/build/gateway.exe`.
+
+Platform differences from the Linux build, all isolated in `Makefile.win`:
+
+- The C/ASM core is compiled to a COFF object
+  (`../c_asm_crypto/build/asm_crypto.o`) and linked **directly into the
+  executable** — there is no Windows `.so`/DLL step.
+- The link line adds the native Winsock import libraries
+  `-lws2_32 -lmswsock` (the latter provides `AcceptEx`, which Asio uses for
+  overlapped accepts).
+- Callbacks use C++20 `std::bind_front`; time conversion and console signals
+  are selected with `#ifdef _WIN32` (`gmtime_s` / `SIGBREAK` versus
+  `gmtime_r` / `SIGTERM`).
+
+Run it the same way, from the MINGW64 shell:
+
+```sh
+GATEWAY_PORT=8080 ASM_CRYPTO_KEY=0x0123456789ABCDEF ./build/gateway.exe
+```
 
 ## Docker
 

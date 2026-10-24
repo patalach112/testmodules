@@ -1,0 +1,68 @@
+#
+# Native Windows build for MinGW64 / MSYS2 (x86_64).
+#
+# Difference from the Linux Makefile: the C/ASM core is not built as a
+# shared library. asm_crypto.c is compiled to a Windows COFF object and
+# linked directly into gateway.exe, alongside the WinSock import libraries.
+#
+# Toolchain (MINGW64 shell):
+#   pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-boost make
+#
+# Build:
+#   make -f Makefile.win clean && make -f Makefile.win
+#
+# A plain `make` in this directory also picks this file up automatically
+# because MSYS2 exports OS=Windows_NT (see Makefile).
+#
+# Explicit rather than ?=: GNU make's built-in default is CC=cc, and not
+# every MinGW environment ships a cc.exe alias. Command-line overrides
+# (make CC=clang CXX=clang++) still take precedence.
+CXX        = g++
+CC         = gcc
+
+# Empty by default so the executable runs on any x86-64 CPU. For a build
+# tuned to the local machine: make MARCH="-march=native"
+MARCH     ?=
+
+CXXFLAGS  ?= -std=c++20 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+             -Iinclude -I../c_asm_crypto/include -MMD -MP
+CFLAGS    ?= -std=c11 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+             -I../c_asm_crypto/include -MMD -MP
+
+# ws2_32:  socket/bind/connect and the Winsock 2 API
+# mswsock: Microsoft extensions Asio uses for AcceptEx and scatter I/O
+LDLIBS    ?= -lws2_32 -lmswsock
+
+BUILD_DIR  := build
+BIN        := $(BUILD_DIR)/gateway.exe
+CRYPTO_DIR := ../c_asm_crypto/build
+CRYPTO_OBJ := $(CRYPTO_DIR)/asm_crypto.o
+
+SRC        := $(wildcard src/*.cpp)
+OBJ        := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRC))
+DEP        := $(OBJ:.o=.d) $(CRYPTO_OBJ:.o=.d)
+
+.PHONY: all clean
+
+all: $(BIN)
+
+$(BUILD_DIR) $(CRYPTO_DIR):
+	mkdir -p $@
+
+# Compile the C/ASM core to a COFF object for direct static linking.
+# MinGW-w64 GCC defines __x86_64__, so the inline assembly path is selected
+# and the same AT&T-syntax routine is emitted as on Linux (COFF instead of ELF).
+$(CRYPTO_OBJ): ../c_asm_crypto/src/asm_crypto.c | $(CRYPTO_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# The object file, not a .so, appears on the link line.
+$(BIN): $(OBJ) $(CRYPTO_OBJ)
+	$(CXX) $(OBJ) $(CRYPTO_OBJ) -o $@ $(LDLIBS)
+
+$(BUILD_DIR)/%.o: src/%.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(BUILD_DIR) $(CRYPTO_DIR)
+
+-include $(DEP)

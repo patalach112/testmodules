@@ -8,6 +8,7 @@
 #include <boost/asio/signal_set.hpp>
 
 #include <algorithm>
+#include <csignal>
 #include <exception>
 #include <iostream>
 #include <thread>
@@ -25,9 +26,14 @@ int main()
         // io_context itself remains a shared, thread-safe scheduler.
         net::io_context ioc(cfg.worker_threads);
 
-        // SIGINT/SIGTERM stop the scheduler; outstanding handlers run down
-        // and every Session closes its socket on destruction.
+        // Signals stop the scheduler; outstanding handlers run down and
+        // every Session closes its socket on destruction. Windows has no
+        // SIGTERM: SIGBREAK covers the console close/Ctrl-Break event.
+#ifdef _WIN32
+        net::signal_set signals(ioc, SIGINT, SIGBREAK);
+#else
         net::signal_set signals(ioc, SIGINT, SIGTERM);
+#endif
         signals.async_wait([&](const boost::system::error_code &, int) {
             ioc.stop();
         });
