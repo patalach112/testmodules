@@ -29,12 +29,19 @@ the gateway publishes no host ports.
 ├── Dockerfile                 multi-stage Debian 13 (trixie) image
 ├── docker-compose.yml         gateway service + optional cloudflared profile
 ├── Makefile                   repository-wide build/test entry points
+├── client/
+│   └── ws_client/             native WebSocket test client (Linux + Windows)
+│       ├── include/wsclient/  reusable synchronous Client class
+│       ├── src/               implementation + CLI
+│       ├── Makefile           Linux: .so + $ORIGIN runpath
+│       └── Makefile.win       Windows: static asm object + ws2_32
 ├── scripts/
 │   └── build-windows.sh       MinGW64/MSYS2 convenience wrapper
 └── server/
     ├── c_asm_crypto/          C11 core library with x86-64 inline assembly
     │   ├── include/asm_crypto.h
     │   ├── src/asm_crypto.c
+    │   ├── tests/             reference-compared unit tests
     │   └── Makefile           builds libasm_crypto.so (versioned, SONAME .so.1)
     └── cpp_gateway/           C++20 WebSocket gateway
         ├── include/gateway/   config, logger, session, listener
@@ -82,15 +89,37 @@ GATEWAY_PORT=8080 ASM_CRYPTO_KEY=0x0123456789ABCDEF \
 ```
 
 The gateway accepts WebSocket upgrades and echoes each frame back after
-running it through the `asm_crypto` XOR transform. Quick check with
-[`wscat`](https://github.com/websockets/wscat):
+running it through the `asm_crypto` XOR transform. The transformed output is
+arbitrary bytes rather than valid UTF-8, so replies always use the binary
+opcode (RFC 6455 text frames require valid UTF-8).
+
+## Native WebSocket client module
+
+`client/ws_client` is a dependency-free (Boost headers only) command-line
+client and a reusable `wsclient::Client` class. It links the same
+`asm_crypto` core as the gateway, so it can verify the whole data path
+without any external tooling:
 
 ```sh
-wscat --connect ws://127.0.0.1:8080/
-Connected (press CTRL+C to quit)
-> hello
-< (XOR-transformed bytes)
+make -C client/ws_client
+
+# one frame, prints the transformed reply as hex
+./client/ws_client/build/ws_client ws://127.0.0.1:8080/ hello
+
+# end-to-end check: reverses the XOR on the reply and compares it to
+# the original payload; exits non-zero on any mismatch
+./client/ws_client/build/ws_client --roundtrip ws://127.0.0.1:8080/ hello
+
+# 100 frames over one connection, key given as decimal
+./client/ws_client/build/ws_client --roundtrip --count 100 \
+    --key 81985529216486895 ws://127.0.0.1:8080/
+
+# pipe a payload through stdin
+cat payload.bin | ./client/ws_client/build/ws_client --binary ws://127.0.0.1:8080/ -
 ```
+
+Exit codes are scriptable: `0` success, `1` connection/verification failure,
+`2` usage error. Use `--help` for the full option list.
 
 ### Environment variables
 
@@ -113,19 +142,30 @@ terminal. Install the toolchain once:
 pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-boost make
 ```
 
-Then build from the repository root or from `server/cpp_gateway`:
+Then build from the repository root or from a component directory —
+MSYS2 exports `OS=Windows_NT`, so every `Makefile` includes its
+`Makefile.win` automatically:
 
 ```sh
-# either, via the wrapper script
+# gateway only, via the wrapper script
 ./scripts/build-windows.sh
 
-# or directly — MSYS2 exports OS=Windows_NT, so Makefile includes
-# Makefile.win automatically
-cd server/cpp_gateway
+# or build everything (gateway + ws_client) from the repository root
 make clean && make
 ```
 
-Output: `server/cpp_gateway/build/gateway.exe`.
+Outputs:
+
+- `server/cpp_gateway/build/gateway.exe`
+- `client/ws_client/build/ws_client.exe`
+
+Test them together in the MINGW64 shell:
+
+```sh
+GATEWAY_PORT=8080 ./server/cpp_gateway/build/gateway.exe &
+./client/ws_client/build/ws_client.exe --roundtrip \
+    ws://127.0.0.1:8080/ "windows native check"
+```
 
 Platform differences from the Linux build, all isolated in `Makefile.win`:
 

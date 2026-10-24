@@ -78,8 +78,10 @@ void Session::on_read(beast::error_code ec, std::size_t /*bytes*/)
     // transform sees a plain pointer pair and never copies the frame twice.
     asm_crypto_xor(rx_.data().data(), tx_.data(), size, crypto_key_);
 
-    // Echo in the same opcode class the client used (text or binary).
-    ws_.binary(ws_.got_binary());
+    // The transformed payload is arbitrary bytes, not guaranteed UTF-8:
+    // RFC 6455 only permits text frames whose payload is valid UTF-8, so
+    // every reply goes out as binary regardless of the incoming opcode.
+    ws_.binary(true);
     ws_.async_write(net::buffer(tx_),
                     std::bind_front(&Session::on_write, shared_from_this()));
 }

@@ -1,0 +1,57 @@
+#
+# Native Windows build for MinGW64 / MSYS2 (x86_64).
+#
+# The asm_crypto core is compiled to a COFF object inside this module's
+# own build directory and linked directly into ws_client.exe. Nothing is
+# written into the server module's tree, so modules stay independent.
+#
+# Toolchain (MINGW64 shell):
+#   pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-boost make
+#
+CXX        = g++
+CC         = gcc
+
+# Empty by default for a portable x86-64 binary; use MARCH="-march=native"
+# for a build tuned to the local machine.
+MARCH      ?=
+
+CXXFLAGS   ?= -std=c++20 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+              -Iinclude -I../../server/c_asm_crypto/include -MMD -MP
+CFLAGS     ?= -std=c11 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+              -I../../server/c_asm_crypto/include -MMD -MP
+
+# ws2_32:  Winsock 2 API (socket, connect, send, recv)
+# mswsock: Microsoft extensions pulled in by Asio's I/O backend
+LDLIBS     ?= -lws2_32 -lmswsock
+
+BUILD_DIR  := build
+BIN        := $(BUILD_DIR)/ws_client.exe
+CRYPTO_OBJ := $(BUILD_DIR)/asm_crypto.o
+CRYPTO_SRC := ../../server/c_asm_crypto/src/asm_crypto.c
+
+SRC        := $(wildcard src/*.cpp)
+OBJ        := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRC))
+DEP        := $(OBJ:.o=.d) $(CRYPTO_OBJ:.o=.d)
+
+.PHONY: all clean
+
+all: $(BIN)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+# The same C/ASM source the gateway uses, compiled as a Windows object.
+$(CRYPTO_OBJ): $(CRYPTO_SRC) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Static object on the link line; there is no DLL step.
+$(BIN): $(OBJ) $(CRYPTO_OBJ)
+	$(CXX) $(OBJ) $(CRYPTO_OBJ) -o $@ $(LDLIBS)
+
+$(BUILD_DIR)/%.o: src/%.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+-include $(DEP)
