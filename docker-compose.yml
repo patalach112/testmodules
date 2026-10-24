@@ -1,0 +1,42 @@
+#
+# Deployment layout behind a Cloudflare Tunnel.
+#
+# The gateway publishes no host ports: cloudflared opens outbound-only
+# connections to the Cloudflare edge, and proxies HTTPS/WSS traffic back to
+# the gateway over the internal Docker network. No raw TCP/UDP is exposed.
+#
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: testmodules/gateway:dev
+    container_name: testmodules-gateway
+    restart: unless-stopped
+    environment:
+      GATEWAY_BIND: "0.0.0.0"
+      GATEWAY_PORT: "8080"
+      GATEWAY_THREADS: "0"
+      # Override in production, e.g. via a .env file or your secret manager.
+      ASM_CRYPTO_KEY: "0x0123456789ABCDEF"
+    expose:
+      - "8080"  # reachable only inside the compose network, never on the host
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+
+  # Optional sidecar. Start it explicitly with:
+  #   CLOUDFLARE_TUNNEL_TOKEN=... docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.3
+    profiles: ["tunnel"]
+    container_name: testmodules-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token "${CLOUDFLARE_TUNNEL_TOKEN}"
+    depends_on:
+      - gateway
