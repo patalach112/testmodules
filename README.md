@@ -63,7 +63,9 @@ make build MARCH=
 # Targeted build for the Intel i5-3470 (Ivy Bridge) — the Makefile default
 make build
 
-# Round-trip smoke test of the XOR transform
+# Unit tests for the C/ASM core (all lengths and buffer alignments,
+# in-place and out-of-place, compared against an independent reference)
+make -C server/c_asm_crypto check
 make test MARCH=
 ```
 
@@ -174,6 +176,17 @@ ingress:
 
 Cloudflare terminates TLS and forwards WSS connections as plain WebSocket
 connections to the gateway.
+
+## Portability of the C/ASM core
+
+`asm_crypto.c` selects the x86-64 inline-assembly fast path only when both
+the architecture and GNU extended-asm support are present
+(`__x86_64__ && __GNUC__`, i.e. GCC/Clang/MinGW-w64). Otherwise a pure-C
+path is used, so the file also compiles on MSVC x64, 32-bit x86 and ARM.
+The assembly routine takes byte pointers, so callers need no alignment and
+the code performs no strict-aliasing-violating `uint64_t *` accesses; the
+repeating key is applied by byte phase on every path, making the result
+endian-independent.
 
 ## Target CPU note
 
