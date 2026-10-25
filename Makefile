@@ -11,12 +11,14 @@ ifeq ($(OS),Windows_NT)
 
 build:
 	$(MAKE) -C server/cpp_gateway
+	$(MAKE) -C clients/win_telemetry
 
 clean:
 	$(MAKE) -C server/cpp_gateway clean
+	$(MAKE) -C clients/win_telemetry clean
 
 test:
-	@echo "Automated smoke tests run on Linux; launch build/gateway.exe on Windows."
+	$(MAKE) -C clients/win_telemetry test
 
 else
 
