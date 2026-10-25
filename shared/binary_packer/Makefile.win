@@ -1,0 +1,44 @@
+#
+# Native Windows build for MinGW64 / MSYS2 (and Zig's mingw target).
+#
+# Produces COFF objects that downstream Makefile.win files link directly
+# into their .exe, mirroring the asm_crypto static-object pattern. The
+# `check` target builds and runs the same test suite as on Linux.
+#
+CXX        = g++
+CC         = gcc
+MARCH      ?=
+
+CFLAGS     ?= -std=c11 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+              -Iinclude -MMD -MP
+CXXFLAGS   ?= -std=c++20 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+              -Iinclude -MMD -MP
+
+BUILD_DIR  := build
+SRC        := $(wildcard src/*.c)
+OBJ        := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
+DEP        := $(OBJ:.o=.d)
+TEST_BIN   := $(BUILD_DIR)/packer_test.exe
+CXXTEST    := $(BUILD_DIR)/cpp_wrapper_check.exe
+
+.PHONY: all clean check
+
+all: $(OBJ)
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+check: $(OBJ) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/packer_test.c $(OBJ) -o $(TEST_BIN)
+	./$(TEST_BIN)
+	$(CXX) $(CXXFLAGS) tests/cpp_wrapper_check.cpp $(OBJ) \
+	    -o $(CXXTEST)
+	./$(CXXTEST)
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+-include $(DEP)

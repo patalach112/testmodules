@@ -81,7 +81,7 @@ namespace EcosystemClient.Converters
     public sealed class QualityToBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-            value as string switch
+            (value as string) switch
             {
                 "EXCELLENT" => Palette.Green,
                 "STABLE" => Palette.Cyan,

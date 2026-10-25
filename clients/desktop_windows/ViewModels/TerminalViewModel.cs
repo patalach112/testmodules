@@ -76,15 +76,17 @@ namespace EcosystemClient
         /// <summary>Raw backing collection, used by the view to follow the tail.</summary>
         public System.Collections.ObjectModel.ObservableCollection<LogEntry> Entries => _log.Entries;
 
-        public ICommand SendCommand { get; }
+        // Concrete command types (not ICommand): the view model re-queries their
+        // CanExecute state explicitly, which ICommand does not expose.
+        public AsyncRelayCommand SendCommand { get; }
 
-        public ICommand ClearCommand { get; }
+        public RelayCommand ClearCommand { get; }
 
-        public ICommand TogglePauseCommand { get; }
+        public RelayCommand TogglePauseCommand { get; }
 
-        public ICommand CopyCommand { get; }
+        public RelayCommand CopyCommand { get; }
 
-        public ICommand SendPingCommand { get; }
+        public AsyncRelayCommand SendPingCommand { get; }
 
         public string FilterText
         {

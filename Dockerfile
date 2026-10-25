@@ -21,8 +21,12 @@ RUN apt-get update \
 
 WORKDIR /src
 COPY server ./server
+COPY shared ./shared
 
-RUN make -C server/c_asm_crypto \
+# The packer is statically linked, so no extra runtime library is needed.
+RUN make -C shared/binary_packer \
+        MARCH="-march=${GCC_ARCH} -mtune=${GCC_ARCH}" \
+ && make -C server/c_asm_crypto \
         MARCH="-march=${GCC_ARCH} -mtune=${GCC_ARCH}" \
  && make -C server/cpp_gateway \
         MARCH="-march=${GCC_ARCH} -mtune=${GCC_ARCH}"

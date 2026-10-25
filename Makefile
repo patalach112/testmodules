@@ -3,14 +3,16 @@
 # remain usable on their own.
 #
 
-# MinGW64/MSYS2: the Windows rules build gateway.exe and compile the C core
-# as a static object. No .so is involved on that platform.
+# MinGW64/MSYS2: the Windows rules build .exe files and compile the C core
+# as static objects. No .so is involved on that platform.
 ifeq ($(OS),Windows_NT)
 
 .PHONY: build clean test desktop
 
 build:
+	$(MAKE) -C shared/binary_packer
 	$(MAKE) -C server/cpp_gateway
+	$(MAKE) -C client/ws_client
 
 # Windows desktop client (WPF). Builds the shared C/ASM core into
 # clients/desktop_windows/native/asm_crypto.dll, then the app, then stages the
@@ -19,11 +21,14 @@ desktop:
 	$(MAKE) -C clients/desktop_windows build
 
 clean:
+	$(MAKE) -C shared/binary_packer clean
 	$(MAKE) -C server/cpp_gateway clean
+	$(MAKE) -C client/ws_client clean
 	-$(MAKE) -C clients/desktop_windows clean
 
 test:
-	@echo "Automated smoke tests run on Linux; launch build/gateway.exe on Windows."
+	@echo "Automated tests run on Linux. On Windows, launch build/gateway.exe"
+	@echo "and exercise it with client/ws_client/build/ws_client.exe --roundtrip."
 
 else
 
@@ -34,27 +39,21 @@ MARCH ?= -march=ivybridge -mtune=ivybridge
 .PHONY: build clean test desktop desktop-native
 
 build:
+	$(MAKE) -C shared/binary_packer MARCH='$(MARCH)'
 	$(MAKE) -C server/c_asm_crypto MARCH='$(MARCH)'
 	$(MAKE) -C server/cpp_gateway MARCH='$(MARCH)'
+	$(MAKE) -C client/ws_client MARCH='$(MARCH)'
 
 clean:
+	$(MAKE) -C shared/binary_packer clean
 	$(MAKE) -C server/c_asm_crypto clean
 	$(MAKE) -C server/cpp_gateway clean
+	$(MAKE) -C client/ws_client clean
 
-# The Windows desktop client targets net8.0-windows and needs a Windows host to
-# build. Its native core, however, is portable and can be built here.
-desktop:
-	@echo "The WPF client builds on Windows only. On a Windows machine:"
-	@echo "  MSYS2     : make -C clients/desktop_windows"
-	@echo "  PowerShell: powershell -ExecutionPolicy Bypass -File clients/desktop_windows/build.ps1"
-	@echo "This host can still build the client's native core: make desktop-native"
-
-desktop-native:
-	$(MAKE) -C clients/desktop_windows native
-
-# Unit tests: builds everything, then runs the asm_crypto test suite
-# (all lengths and alignments, in-place and out-of-place, reference compared).
+# Unit tests: builds everything, then runs the asm_crypto and
+# binary_packer suites (reference vectors, corruption cases, alignments).
 test: build
+	$(MAKE) -C shared/binary_packer check
 	$(MAKE) -C server/c_asm_crypto check
 
 endif
