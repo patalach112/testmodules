@@ -36,6 +36,11 @@ the gateway publishes no host ports.
 │       ├── src/               implementation + CLI
 │       ├── Makefile           Linux: .so + $ORIGIN runpath
 │       └── Makefile.win       Windows: static asm object + ws2_32
+├── clients/
+│   └── desktop_windows/       EcoUI: reusable WPF component library + demo
+│       ├── EcoUI/             EcoWindow, ThemeEngine, EcoTerminal,
+│       │                      EcoStatCard, EcoStatusBadge, theme tokens
+│       └── EcoUI.Demo/        minimal consumer that proves reusability
 ├── scripts/
 │   └── build-windows.sh       MinGW64/MSYS2 convenience wrapper
 ├── shared/
@@ -243,36 +248,46 @@ Run it the same way, from the MINGW64 shell:
 GATEWAY_PORT=8080 ASM_CRYPTO_KEY=0x0123456789ABCDEF ./build/gateway.exe
 ```
 
-## Windows desktop client (C# / WPF)
+## EcoUI (C# / WPF component library)
 
-`clients/desktop_windows` is the native Windows client: a borderless,
-custom-chromed dashboard (dark cyberpunk theme) that speaks WSS to the gateway,
-decodes inbound frames with the same C/ASM core, and shows live latency,
-throughput, packet and crypto counters plus a wire-level terminal.
+`clients/desktop_windows` is a reusable Windows UI toolkit, not an application:
+it ships controls, design tokens and standard control styles, plus a minimal demo
+that consumes them. It contains no networking, crypto or domain logic.
+
+* `EcoWindow` — frameless window base with native drag / Aero Snap / double-click
+  maximise / resize borders (via `WindowChrome`, so the window stays hardware
+  accelerated; no `AllowsTransparency`).
+* `ThemeEngine` — dark and light schemes with eight accent ramps, swapped at
+  runtime through semantic token dictionaries.
+* `EcoTerminal` — bounded, virtualised log viewer with thread-safe `Append`.
+* `EcoStatCard` — metric tile (title / value / subtext / trend).
+* `EcoStatusBadge` — dot plus optional label, five semantic states.
+* Implicit styles for `Button`, `TextBox`, `ComboBox`, `CheckBox` and `ScrollBar`,
+  plus `Eco.PrimaryButton`, `Eco.SubtleButton`, `Eco.DangerButton` and text styles.
 
 ```powershell
 cd clients\desktop_windows
-
-# PowerShell: builds asm_crypto.dll from ../../server/c_asm_crypto, then the app,
-# and stages the DLL next to the executable
-powershell -ExecutionPolicy Bypass -File .\build.ps1
-
-# or in an MSYS2 / MINGW64 shell
-make            # native DLL + WPF app
-make run        # launch
-make publish    # bin/Release/net8.0-windows/win-x64/publish
+dotnet build                        # library + demo (net8.0-windows, .NET 8 SDK)
+dotnet run --project EcoUI.Demo     # launch the demo
 ```
 
-Requirements: Windows 10 1809+ and the .NET 8 SDK; MinGW-w64 gcc is optional
-(without it the client runs on a bit-identical managed fallback and says so in
-the UI). The native library is resolved from the application directory,
-`native/`, `runtimes/win-x64/native/` or `%ECOSYSTEM_CRYPTO_LIBRARY%` — never
-from the current working directory.
+Integration is one call plus a base class:
 
-Protocol note: the gateway XORs every echoed frame, so the client sends plaintext
-and decodes inbound frames with the shared key. `ASM_CRYPTO_KEY` must therefore
-match on both sides. See `clients/desktop_windows/README.md` for the architecture,
-threading model, latency-probe frame layout and performance modes.
+```csharp
+ThemeEngine.Apply(EcoTheme.Dark, EcoAccent.Indigo);   // before the first window
+```
+
+```xml
+<eco:EcoWindow x:Class="MyApp.MainWindow"
+               xmlns:eco="clr-namespace:EcoUI;assembly=EcoUI"
+               xmlns:eco2="clr-namespace:EcoUI.Controls;assembly=EcoUI"
+               Title="My app" Width="900" Height="600">
+    <eco2:EcoStatCard Title="Requests" Value="1,284" Trend="+4.1%" TrendKind="Positive" />
+</eco:EcoWindow>
+```
+
+See `clients/desktop_windows/README.md` for the token reference, control APIs and
+design notes.
 
 ## Docker
 

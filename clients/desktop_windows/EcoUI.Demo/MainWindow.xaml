@@ -1,0 +1,85 @@
+<eco:EcoWindow x:Class="EcoUI.Demo.MainWindow"
+               xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+               xmlns:eco="clr-namespace:EcoUI;assembly=EcoUI"
+               xmlns:controls="clr-namespace:EcoUI.Controls;assembly=EcoUI"
+               Title="EcoUI Demo"
+               Width="860" Height="580"
+               WindowStartupLocation="CenterScreen">
+
+    <!-- Every visual below comes from the library: no local styles, no colours,
+         no templates. This file is the whole demo application. -->
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="EcoUI component library" Style="{StaticResource Eco.Text.Heading}" />
+            <TextBlock Text="Themeable WPF controls with no application logic"
+                       Style="{StaticResource Eco.Text.Subtitle}" Margin="0,4,0,0" />
+        </StackPanel>
+
+        <UniformGrid Grid.Row="1" Rows="1" Margin="0,18,0,0">
+            <controls:EcoStatCard Title="Active sessions" Value="1,284" Subtext="across 4 regions"
+                                  Trend="+8.2%" TrendKind="Positive" Margin="0,0,10,0" />
+            <controls:EcoStatCard Title="Error rate" Value="0.42%" Subtext="last 24 hours"
+                                  Trend="-0.1%" TrendKind="Negative" Margin="0,0,10,0" />
+            <controls:EcoStatCard Title="Queue depth" Value="37" Subtext="holding steady"
+                                  TrendKind="Neutral" Margin="0,0,10,0" />
+            <controls:EcoStatCard Title="Uptime" Value="99.98%" Subtext="trailing 30 days" />
+        </UniformGrid>
+
+        <Border Grid.Row="2" Style="{StaticResource Eco.Card}" Margin="0,18,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Status badges" Style="{StaticResource Eco.Text.Label}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <controls:EcoStatusBadge Status="Success" Text="Operational" Margin="0,0,8,0" />
+                        <controls:EcoStatusBadge Status="Warning" Text="Degraded" Margin="0,0,8,0" />
+                        <controls:EcoStatusBadge Status="Error" Text="Outage" Margin="0,0,8,0" />
+                        <controls:EcoStatusBadge Status="Idle" Text="Unknown" />
+                    </StackPanel>
+
+                    <TextBlock Text="Inputs" Style="{StaticResource Eco.Text.Label}" Margin="0,18,0,0" />
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBox Width="170" Text="Search" />
+                        <ComboBox Width="150" Margin="8,0,0,0" SelectedIndex="0">
+                            <ComboBoxItem Content="All regions" />
+                            <ComboBoxItem Content="eu-west" />
+                            <ComboBoxItem Content="us-east" />
+                        </ComboBox>
+                        <CheckBox Content="Live" IsChecked="True" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Content="Secondary" />
+                    <Button Content="Primary" Style="{StaticResource Eco.PrimaryButton}" Margin="8,0,0,0" />
+                    <Button Content="Delete" Style="{StaticResource Eco.DangerButton}" Margin="8,0,0,0" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="0,18,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="EcoTerminal" Style="{StaticResource Eco.Text.Label}" />
+            <Button x:Name="ThemeButton" Content="Switch theme" Style="{StaticResource Eco.SubtleButton}"
+                    HorizontalAlignment="Right" Click="OnSwitchThemeClick" />
+
+            <controls:EcoTerminal x:Name="Terminal" Grid.Row="1" Margin="0,8,0,0" MaxEntries="500" />
+        </Grid>
+    </Grid>
+</eco:EcoWindow>

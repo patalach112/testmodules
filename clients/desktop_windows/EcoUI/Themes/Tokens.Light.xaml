@@ -1,0 +1,53 @@
+<!--
+    EcoUI · Light tokens
+
+    Same key set as Tokens.Dark.xaml - only the values differ. Swapping this
+    dictionary for the dark one is the entire light/dark mechanism.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================== surfaces ============================== -->
+    <SolidColorBrush x:Key="Eco.Surface.Window" Color="#FFF5F6F8" />
+    <SolidColorBrush x:Key="Eco.Surface.Panel" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Eco.Surface.Raised" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="Eco.Surface.Sunken" Color="#FFEEF0F4" />
+    <SolidColorBrush x:Key="Eco.Surface.Hover" Color="#FFF1F3F7" />
+    <SolidColorBrush x:Key="Eco.Surface.Pressed" Color="#FFE7EAF0" />
+
+    <!-- =============================== borders ============================== -->
+    <SolidColorBrush x:Key="Eco.Border" Color="#FFE3E6EC" />
+    <SolidColorBrush x:Key="Eco.Border.Strong" Color="#FFD2D7E0" />
+    <SolidColorBrush x:Key="Eco.Border.Subtle" Color="#FFEDEFF4" />
+
+    <!-- ================================ text ================================ -->
+    <SolidColorBrush x:Key="Eco.Text.Primary" Color="#FF15181D" />
+    <SolidColorBrush x:Key="Eco.Text.Secondary" Color="#FF4C5565" />
+    <SolidColorBrush x:Key="Eco.Text.Muted" Color="#FF858E9E" />
+    <SolidColorBrush x:Key="Eco.Text.Inverse" Color="#FFFFFFFF" />
+
+    <!-- =============================== accent =============================== -->
+    <SolidColorBrush x:Key="Eco.Accent" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="Eco.Accent.Hover" Color="#FF1D4ED8" />
+    <SolidColorBrush x:Key="Eco.Accent.Pressed" Color="#FF1A43B4" />
+    <SolidColorBrush x:Key="Eco.Accent.Soft" Color="#FFE4ECFD" />
+    <SolidColorBrush x:Key="Eco.OnAccent" Color="#FFFFFFFF" />
+
+    <!-- =============================== status =============================== -->
+    <SolidColorBrush x:Key="Eco.Success" Color="#FF178A5B" />
+    <SolidColorBrush x:Key="Eco.Success.Soft" Color="#FFE3F5EC" />
+    <SolidColorBrush x:Key="Eco.Warning" Color="#FFA96A12" />
+    <SolidColorBrush x:Key="Eco.Warning.Soft" Color="#FFFCF1DE" />
+    <SolidColorBrush x:Key="Eco.Error" Color="#FFC6453F" />
+    <SolidColorBrush x:Key="Eco.Error.Soft" Color="#FFFBE7E6" />
+    <SolidColorBrush x:Key="Eco.Info" Color="#FF2B6CB0" />
+    <SolidColorBrush x:Key="Eco.Info.Soft" Color="#FFE5EEF9" />
+    <SolidColorBrush x:Key="Eco.Idle" Color="#FF7A8494" />
+    <SolidColorBrush x:Key="Eco.Idle.Soft" Color="#FFEDEFF4" />
+
+    <!-- =========================== typography =============================== -->
+    <FontFamily x:Key="Eco.Font.Ui">Segoe UI Variable Text, Segoe UI, Tahoma</FontFamily>
+    <FontFamily x:Key="Eco.Font.Display">Segoe UI Variable Display, Segoe UI Semibold, Segoe UI, Tahoma</FontFamily>
+    <FontFamily x:Key="Eco.Font.Mono">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+</ResourceDictionary>

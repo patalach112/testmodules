@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    EcoUI - a reusable WPF component library.
+
+    Contains no application logic: only themeable controls, design tokens and
+    standard control styles. Reference it from any net8.0-windows WPF app.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <RootNamespace>EcoUI</RootNamespace>
+    <AssemblyName>EcoUI</AssemblyName>
+    <Description>Themeable WPF UI toolkit: frameless window, design tokens, terminal, stat card and status badge.</Description>
+  </PropertyGroup>
+
+</Project>

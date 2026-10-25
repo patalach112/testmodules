@@ -1,0 +1,11 @@
+<Application x:Class="EcoUI.Demo.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+    <!--
+        Deliberately empty: EcoUI's theme dictionaries are merged by
+        ThemeEngine.Apply() in OnStartup, so the demo contains no styling of its
+        own. That is the whole point - the library is self-contained.
+    -->
+    <Application.Resources />
+</Application>

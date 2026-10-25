@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    EcoUI.Demo - a deliberately tiny consumer of the EcoUI library.
+
+    Its only job is to prove that EcoUI is reusable: no business logic, no
+    services, no custom theme code beyond ThemeEngine.Apply().
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>EcoUI.Demo</RootNamespace>
+    <AssemblyName>EcoUI.Demo</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EcoUI\EcoUI.csproj" />
+  </ItemGroup>
+
+</Project>
