@@ -24,10 +24,13 @@ CC         = gcc
 # tuned to the local machine: make MARCH="-march=native"
 MARCH     ?=
 
+PACKER_DIR := ../../shared/binary_packer
+
 CXXFLAGS  ?= -std=c++20 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
-             -Iinclude -I../c_asm_crypto/include -MMD -MP
+             -Iinclude -I../c_asm_crypto/include -I$(PACKER_DIR)/include \
+             -MMD -MP
 CFLAGS    ?= -std=c11 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
-             -I../c_asm_crypto/include -MMD -MP
+             -I../c_asm_crypto/include -I$(PACKER_DIR)/include -MMD -MP
 
 # ws2_32:  socket/bind/connect and the Winsock 2 API
 # mswsock: Microsoft extensions Asio uses for AcceptEx and scatter I/O
@@ -37,10 +40,11 @@ BUILD_DIR  := build
 BIN        := $(BUILD_DIR)/gateway.exe
 CRYPTO_DIR := ../c_asm_crypto/build
 CRYPTO_OBJ := $(CRYPTO_DIR)/asm_crypto.o
+PACKER_OBJ := $(BUILD_DIR)/bp_crc32c.o $(BUILD_DIR)/binary_pack.o
 
 SRC        := $(wildcard src/*.cpp)
 OBJ        := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SRC))
-DEP        := $(OBJ:.o=.d) $(CRYPTO_OBJ:.o=.d)
+DEP        := $(OBJ:.o=.d) $(CRYPTO_OBJ:.o=.d) $(PACKER_OBJ:.o=.d)
 
 .PHONY: all clean
 
@@ -55,9 +59,13 @@ $(BUILD_DIR) $(CRYPTO_DIR):
 $(CRYPTO_OBJ): ../c_asm_crypto/src/asm_crypto.c | $(CRYPTO_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# The object file, not a .so, appears on the link line.
-$(BIN): $(OBJ) $(CRYPTO_OBJ)
-	$(CXX) $(OBJ) $(CRYPTO_OBJ) -o $@ $(LDLIBS)
+# Binary Packet Protocol core, compiled as COFF objects into this module.
+$(BUILD_DIR)/%.o: $(PACKER_DIR)/src/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Static objects, not .so files, appear on the link line.
+$(BIN): $(OBJ) $(CRYPTO_OBJ) $(PACKER_OBJ)
+	$(CXX) $(OBJ) $(CRYPTO_OBJ) $(PACKER_OBJ) -o $@ $(LDLIBS)
 
 $(BUILD_DIR)/%.o: src/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

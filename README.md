@@ -14,9 +14,10 @@ Cloudflare edge ── outbound tunnel ──► cloudflared (container, no inbo
                                           │  plain HTTP/WS on the Docker network
                                           ▼
                                      cpp_gateway (C++20, Boost.Beast/Asio)
+                                          │  BPP framing (shared/binary_packer)
                                           │  in-memory payload processing
                                           ▼
-                                     libasm_crypto.so (C11 + x86-64 inline ASM)
+                     libbinary_packer.a (CRC32-C, SSE4.2) + libasm_crypto.so
 ```
 
 No raw TCP/UDP is exposed: `cloudflared` dials out to the Cloudflare edge, and
@@ -29,21 +30,26 @@ the gateway publishes no host ports.
 ├── Dockerfile                 multi-stage Debian 13 (trixie) image
 ├── docker-compose.yml         gateway service + optional cloudflared profile
 ├── Makefile                   repository-wide build/test entry points
+├── client/
+│   └── ws_client/             native WebSocket test client (Linux + Windows)
+│       ├── include/wsclient/  reusable synchronous Client class
+│       ├── src/               implementation + CLI
+│       ├── Makefile           Linux: .so + $ORIGIN runpath
+│       └── Makefile.win       Windows: static asm object + ws2_32
 ├── scripts/
 │   └── build-windows.sh       MinGW64/MSYS2 convenience wrapper
-├── clients/
-│   └── desktop_windows/     Windows desktop client (C# / WPF, net8.0-windows)
-│       ├── EcosystemClient.csproj
-│       ├── NativeCrypto.cs  P/Invoke wrapper around asm_crypto_xor
-│       ├── NetworkEngine.cs ClientWebSocket supervisor (auto-reconnect)
-│       ├── App.xaml         custom control templates / design system
-│       ├── MainWindow.xaml  borderless shell: title bar, nav, dashboard
-│       ├── Makefile         MSYS2 build: native DLL + app + staging
-│       └── build.ps1        PowerShell build (same steps, no make)
+├── shared/
+│   └── binary_packer/         Binary Packet Protocol (C ABI + C++ wrapper)
+│       ├── include/binary_packer/  binary_pack.h, packet.hpp, opcodes.h
+│       ├── src/               CRC32-C SSE4.2/soft, endian, pack/parse
+│       ├── tests/             reference vectors, framing, corruption
+│       ├── Makefile           Linux: static archive + `make check`
+│       └── Makefile.win       Windows: COFF objects + `make check`
 └── server/
     ├── c_asm_crypto/          C11 core library with x86-64 inline assembly
     │   ├── include/asm_crypto.h
     │   ├── src/asm_crypto.c
+    │   ├── tests/             reference-compared unit tests
     │   └── Makefile           builds libasm_crypto.so (versioned, SONAME .so.1)
     └── cpp_gateway/           C++20 WebSocket gateway
         ├── include/gateway/   config, logger, session, listener
@@ -72,9 +78,8 @@ make build MARCH=
 # Targeted build for the Intel i5-3470 (Ivy Bridge) — the Makefile default
 make build
 
-# Unit tests for the C/ASM core (all lengths and buffer alignments,
-# in-place and out-of-place, compared against an independent reference)
-make -C server/c_asm_crypto check
+# Unit tests for both C cores (CRC vectors, framing, corruption cases,
+# XOR round trips across every length and buffer alignment)
 make test MARCH=
 ```
 
@@ -91,15 +96,85 @@ GATEWAY_PORT=8080 ASM_CRYPTO_KEY=0x0123456789ABCDEF \
 ```
 
 The gateway accepts WebSocket upgrades and echoes each frame back after
-running it through the `asm_crypto` XOR transform. Quick check with
-[`wscat`](https://github.com/websockets/wscat):
+running it through the `asm_crypto` XOR transform. The transformed output is
+arbitrary bytes rather than valid UTF-8, so replies always use the binary
+opcode (RFC 6455 text frames require valid UTF-8).
+
+## Binary Packet Protocol (`shared/binary_packer`)
+
+Application traffic uses a compact binary wire format instead of JSON. Every
+packet is a fixed 12-byte header, the payload, and a trailing checksum; all
+multi-byte integers are network byte order (big endian):
+
+| offset | size | field                                  |
+|--------|------|----------------------------------------|
+| 0      | 2    | magic `0x50 0x4B` (`'P' 'K'`)          |
+| 2      | 1    | opcode / packet type                   |
+| 3      | 1    | flags                                  |
+| 4      | 4    | sequence number, big endian            |
+| 8      | 4    | payload length, big endian             |
+| 12     | N    | payload (may be empty)                 |
+| 12+N   | 4    | CRC32-C over header + payload, big endian |
+
+The checksum is **CRC-32C (Castagnoli)**, the variant of the SSE4.2 `crc32`
+instruction. The implementation probes CPUID once and dispatches at runtime:
+hardware `crc32q/crc32l/crc32b` when SSE4.2 is present, a portable bitwise
+routine otherwise (also used on non-x86). A `-DBP_CRC_HAVE_X86=0` override
+forces the software path for testing.
+
+The C core never allocates and never casts wire bytes to structs, so buffers
+of any alignment are safe. The C++ wrapper is zero-allocation:
+`PacketBuilder` writes into caller-provided storage, and `PacketParser`
+returns a `std::span` view into the receive buffer. The gateway transforms
+the payload directly into the builder's reserved region, so the data path
+incurs no extra copy beyond the transform itself.
 
 ```sh
-wscat --connect ws://127.0.0.1:8080/
-Connected (press CTRL+C to quit)
-> hello
-< (XOR-transformed bytes)
+# Unit tests: CRC reference vectors ("123456789" -> 0xE3069283), hardware/
+# software agreement, framing round trips, every corruption mode.
+make -C shared/binary_packer check
 ```
+
+Opcodes live in `binary_packer/opcodes.h`: `BP_OP_ECHO` (transformed echo),
+`BP_OP_ACK`, and `BP_OP_ERROR` (the gateway answers malformed packets with an
+ERROR frame whose one-byte payload is the parser's status code).
+
+The client speaks the protocol with `--packet`; `--roundtrip` then validates
+the checksum, the echoed sequence number and the XOR round trip:
+
+```sh
+./client/ws_client/build/ws_client --packet --roundtrip \
+    --count 100 ws://127.0.0.1:8080/ "hello bpp"
+# frame 100: PASS (seq 100, 9 bytes transformed and restored, CRC32-C valid)
+```
+
+## Native WebSocket client module
+
+`client/ws_client` is a dependency-free (Boost headers only) command-line
+client and a reusable `wsclient::Client` class. It links the same
+`asm_crypto` core as the gateway, so it can verify the whole data path
+without any external tooling:
+
+```sh
+make -C client/ws_client
+
+# one frame, prints the transformed reply as hex
+./client/ws_client/build/ws_client ws://127.0.0.1:8080/ hello
+
+# end-to-end check: reverses the XOR on the reply and compares it to
+# the original payload; exits non-zero on any mismatch
+./client/ws_client/build/ws_client --roundtrip ws://127.0.0.1:8080/ hello
+
+# 100 frames over one connection, key given as decimal
+./client/ws_client/build/ws_client --roundtrip --count 100 \
+    --key 81985529216486895 ws://127.0.0.1:8080/
+
+# pipe a payload through stdin
+cat payload.bin | ./client/ws_client/build/ws_client --binary ws://127.0.0.1:8080/ -
+```
+
+Exit codes are scriptable: `0` success, `1` connection/verification failure,
+`2` usage error. Use `--help` for the full option list.
 
 ### Environment variables
 
@@ -122,19 +197,33 @@ terminal. Install the toolchain once:
 pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-boost make
 ```
 
-Then build from the repository root or from `server/cpp_gateway`:
+Then build from the repository root or from a component directory —
+MSYS2 exports `OS=Windows_NT`, so every `Makefile` includes its
+`Makefile.win` automatically:
 
 ```sh
-# either, via the wrapper script
+# gateway only, via the wrapper script
 ./scripts/build-windows.sh
 
-# or directly — MSYS2 exports OS=Windows_NT, so Makefile includes
-# Makefile.win automatically
-cd server/cpp_gateway
+# or build everything (gateway + ws_client) from the repository root
 make clean && make
 ```
 
-Output: `server/cpp_gateway/build/gateway.exe`.
+Outputs:
+
+- `server/cpp_gateway/build/gateway.exe`
+- `client/ws_client/build/ws_client.exe`
+
+Test them together in the MINGW64 shell:
+
+```sh
+GATEWAY_PORT=8080 ./server/cpp_gateway/build/gateway.exe &
+./client/ws_client/build/ws_client.exe --packet --roundtrip \
+    ws://127.0.0.1:8080/ "windows native check"
+```
+
+The packer's own suite runs in MINGW64 too:
+`make -C shared/binary_packer -f Makefile.win check`.
 
 Platform differences from the Linux build, all isolated in `Makefile.win`:
 
