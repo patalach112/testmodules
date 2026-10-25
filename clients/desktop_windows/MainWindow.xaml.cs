@@ -50,6 +50,7 @@ namespace EcosystemClient
             }
 
             ConfigureWindowChrome();
+            FitToWorkArea();
             ApplyChromeVisuals();
 
             StateChanged += (_, _) => ApplyChromeVisuals();
@@ -64,6 +65,25 @@ namespace EcosystemClient
         // ---------------------------------------------------------------------
         // Window chrome
         // ---------------------------------------------------------------------
+
+        /// <summary>
+        /// The design targets 1500x920; on a 1366x768 laptop that would exceed the
+        /// work area, so clamp before the first layout pass.
+        /// </summary>
+        private void FitToWorkArea()
+        {
+            Rect workArea = SystemParameters.WorkArea;
+
+            if (Width > workArea.Width - 40d)
+            {
+                Width = Math.Max(MinWidth, workArea.Width - 40d);
+            }
+
+            if (Height > workArea.Height - 40d)
+            {
+                Height = Math.Max(MinHeight, workArea.Height - 40d);
+            }
+        }
 
         private void ConfigureWindowChrome()
         {
