@@ -14,3 +14,10 @@
 .idea/
 *.swp
 *~
+
+# .NET desktop client (WPF) build output and staged native library
+**/bin/
+**/obj/
+clients/desktop_windows/native/*.dll
+clients/desktop_windows/native/*.so
+clients/desktop_windows/native/*.a

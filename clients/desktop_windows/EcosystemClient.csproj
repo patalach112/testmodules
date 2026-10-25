@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Windows desktop client for the testmodules ecosystem.
+
+    Target framework: net8.0-windows (WPF). The client P/Invokes into the
+    native C/ASM core (asm_crypto.dll), so the process is pinned to 64-bit:
+    the shipped DLL is an x86-64 PE built with MinGW-w64 (see Makefile).
+
+    Build:
+      dotnet build -c Release            (from this directory)
+      make                               (MSYS2 / MINGW64 shell, builds DLL too)
+      powershell -ExecutionPolicy Bypass -File .\build.ps1
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>EcosystemClient</RootNamespace>
+    <AssemblyName>EcosystemClient</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Deterministic, trimmed-down, warning-clean output. -->
+    <!-- x64 only: the native core is an x86-64 PE. Deliberately no <Platforms>
+         override, so the output path stays bin/<Config>/net8.0-windows and the
+         build scripts can stage asm_crypto.dll deterministically. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!-- Feature switches that keep the client snappy at startup. -->
+    <TieredPGO>true</TieredPGO>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>true</Optimize>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The native core. `make native` (or build.ps1) drops asm_crypto.dll here.
+      The item is conditional so a clean checkout still compiles: NativeCrypto
+      then runs on its managed fallback path and the UI says so explicitly.
+    -->
+    <None Include="native\asm_crypto.dll" Condition="Exists('native\asm_crypto.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <TargetPath>asm_crypto.dll</TargetPath>
+      <Visible>false</Visible>
+    </None>
+    <None Include="README.md" />
+  </ItemGroup>
+
+</Project>
