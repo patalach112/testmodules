@@ -1,0 +1,204 @@
+<UserControl x:Class="EcosystemClient.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1.35*" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ========================== LEFT COLUMN ========================== -->
+        <Grid Grid.Column="0" Margin="0,0,14,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Connection -->
+            <Border Grid.Row="0" Style="{StaticResource CardBorderStyle}" Padding="22,18" Margin="0,0,0,14">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="CONNECTION" Style="{StaticResource EyebrowStyle}"
+                                   VerticalAlignment="Center" />
+                        <Border Width="26" Height="1" Margin="10,0"
+                                Background="{StaticResource AccentLineBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <TextBlock Text="WEBSOCKET ENDPOINT" Style="{StaticResource EyebrowStyle}" FontSize="9"
+                               Margin="0,0,0,6" />
+                    <TextBox Style="{StaticResource FieldTextBoxStyle}"
+                             Text="{Binding Settings.Endpoint, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="{Binding EndpointHint}" Style="{StaticResource MutedTextStyle}"
+                               FontSize="10" Margin="2,7,0,0"
+                               Foreground="{StaticResource TextMutedBrush}" />
+
+                    <TextBlock Text="ASM_CRYPTO_KEY (64-BIT, HEX OR DECIMAL)" Style="{StaticResource EyebrowStyle}"
+                               FontSize="9" Margin="0,16,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Style="{StaticResource FieldTextBoxStyle}"
+                                 Text="{Binding Settings.CryptoKey, UpdateSourceTrigger=PropertyChanged}" />
+                        <Border Grid.Column="1" Style="{StaticResource StatusPillStyle}" Padding="12,8"
+                                Margin="10,0,0,0" Background="#1414141E"
+                                BorderBrush="{StaticResource PurpleBrush}">
+                            <TextBlock Text="{Binding CryptoKeyPreview}" Style="{StaticResource MonoTextStyle}"
+                                       FontSize="10.5" Foreground="{StaticResource PurpleBrush}" />
+                        </Border>
+                    </Grid>
+
+                    <Border Style="{StaticResource DividerStyle}" Margin="0,18,0,14" />
+
+                    <CheckBox Style="{StaticResource SwitchCheckBoxStyle}" Margin="0,0,0,12"
+                              IsChecked="{Binding Settings.AutoConnect}"
+                              Content="Connect automatically at startup" />
+
+                    <CheckBox Style="{StaticResource SwitchCheckBoxStyle}" Margin="0,0,0,12"
+                              IsChecked="{Binding Settings.DecodeInbound}"
+                              Content="Decode inbound frames (XOR with the shared key)" />
+
+                    <CheckBox Style="{StaticResource SwitchCheckBoxStyle}"
+                              IsChecked="{Binding Settings.EnableLatencyProbes}"
+                              Content="Send round-trip latency probes" />
+                    <TextBlock Text="Probes double as the dead-socket watchdog: an unanswered probe window forces a reconnect."
+                               Style="{StaticResource MutedTextStyle}" FontSize="10"
+                               Margin="52,6,0,0" Foreground="{StaticResource TextMutedBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Performance -->
+            <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="22,18">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="PERFORMANCE" Style="{StaticResource EyebrowStyle}"
+                                   VerticalAlignment="Center" />
+                        <Border Width="26" Height="1" Margin="10,0"
+                                Background="{StaticResource AccentLineBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="130" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                            <TextBlock Text="Receive buffer (KiB)" Style="{StaticResource BodyTextStyle}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="Rented once per connection from ArrayPool; larger buffers suit big frames."
+                                       Style="{StaticResource MutedTextStyle}" FontSize="10"
+                                       Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1" Style="{StaticResource FieldTextBoxStyle}"
+                                 Text="{Binding Settings.ReceiveBufferKb, UpdateSourceTrigger=LostFocus}" />
+                    </Grid>
+
+                    <Grid Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="130" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,14,0">
+                            <TextBlock Text="Health timeout (s)" Style="{StaticResource BodyTextStyle}"
+                                       Foreground="{StaticResource TextSecondaryBrush}" />
+                            <TextBlock Text="No inbound frame for this long tears the socket down and reconnects."
+                                       Style="{StaticResource MutedTextStyle}" FontSize="10"
+                                       Margin="0,4,0,0" Foreground="{StaticResource TextMutedBrush}" />
+                        </StackPanel>
+                        <TextBox Grid.Column="1" Style="{StaticResource FieldTextBoxStyle}"
+                                 Text="{Binding Settings.HealthTimeoutSeconds, UpdateSourceTrigger=LostFocus}" />
+                    </Grid>
+
+                    <Border Style="{StaticResource DividerStyle}" Margin="0,4,0,14" />
+
+                    <CheckBox Style="{StaticResource SwitchCheckBoxStyle}"
+                              IsChecked="{Binding Settings.PreferOpaqueWindow}"
+                              Content="Opaque window (maximum GPU throughput, requires restart)" />
+                    <TextBlock Text="Transparent windows are composited by Windows as layered windows, which disables GPU acceleration. Turn this on for the highest frame rates; you lose the rounded silhouette and the outer glow."
+                               Style="{StaticResource MutedTextStyle}" FontSize="10"
+                               Margin="52,8,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ========================== RIGHT COLUMN ========================= -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Apply -->
+            <Border Grid.Row="0" Style="{StaticResource ElevatedCardBorderStyle}" Padding="22,18" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="APPLY CHANGES" Style="{StaticResource EyebrowStyle}" Margin="0,0,0,12" />
+                    <TextBlock Text="Saving persists settings.json and restarts the transport with the new options."
+                               Style="{StaticResource MutedTextStyle}" FontSize="10.5"
+                               Foreground="{StaticResource TextMutedBrush}" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <Button Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding SaveCommand}" Content="SAVE &amp; RECONNECT" />
+                        <Button Style="{StaticResource GhostButtonStyle}"
+                                Command="{Binding ResetCommand}" Content="DEFAULTS" Margin="10,0,0,0" />
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding StatusText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="10.5" Margin="0,14,0,0" TextWrapping="Wrap"
+                               Foreground="{StaticResource CyanBrush}" />
+
+                    <Border Style="{StaticResource DividerStyle}" Margin="0,14,0,12" />
+
+                    <TextBlock Text="CONFIG FILE" Style="{StaticResource EyebrowStyle}" FontSize="9" />
+                    <TextBlock Text="{Binding SettingsPathText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="10" Margin="0,5,0,10" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                    <Button Style="{StaticResource GhostButtonStyle}" HorizontalAlignment="Left"
+                            Command="{Binding OpenSettingsFolderCommand}" Content="OPEN FOLDER"
+                            Padding="14,7" FontSize="10.5" />
+                </StackPanel>
+            </Border>
+
+            <!-- Environment -->
+            <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="22,18">
+                <StackPanel>
+                    <TextBlock Text="ENVIRONMENT" Style="{StaticResource EyebrowStyle}" Margin="0,0,0,14" />
+
+                    <TextBlock Text="RUNTIME" Style="{StaticResource EyebrowStyle}" FontSize="9" />
+                    <TextBlock Text="{Binding RuntimeText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="10.5" Margin="0,5,0,12" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+
+                    <TextBlock Text="OPERATING SYSTEM" Style="{StaticResource EyebrowStyle}" FontSize="9" />
+                    <TextBlock Text="{Binding OsText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="10.5" Margin="0,5,0,12" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+
+                    <TextBlock Text="PROCESS" Style="{StaticResource EyebrowStyle}" FontSize="9" />
+                    <TextBlock Text="{Binding ProcessText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="10.5" Margin="0,5,0,12"
+                               Foreground="{StaticResource TextSecondaryBrush}" />
+
+                    <Border Style="{StaticResource DividerStyle}" Margin="0,2,0,12" />
+
+                    <TextBlock Text="NATIVE CRYPTO CORE" Style="{StaticResource EyebrowStyle}" FontSize="9" />
+                    <TextBlock Text="{Binding NativeStatusText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="10.5" Margin="0,5,0,6"
+                               Foreground="{StaticResource GreenBrush}" />
+                    <TextBlock Text="{Binding NativePathText}" Style="{StaticResource MonoTextStyle}"
+                               FontSize="9.5" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMutedBrush}" />
+
+                    <Border Style="{StaticResource DividerStyle}" Margin="0,14,0,12" />
+                    <TextBlock Text="Build the DLL next to the executable with `make native` (MSYS2) or build.ps1. If it is absent the managed fallback runs and this page says so."
+                               Style="{StaticResource MutedTextStyle}" FontSize="9.5" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
