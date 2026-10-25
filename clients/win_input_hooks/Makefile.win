@@ -1,0 +1,64 @@
+#
+# Native Windows build for MinGW-w64 (GCC / Make)
+#
+# Builds the Windows Game Detector & Global Hotkey engine (win_input_hooks.exe)
+# and links directly with the c_asm_crypto core object and Win32 user32/ws2_32/psapi.
+#
+
+CC         = gcc
+MARCH     ?=
+
+CFLAGS    ?= -std=c11 -O3 $(MARCH) -Wall -Wextra -Wpedantic \
+             -Iinclude -I../../server/c_asm_crypto/include -MMD -MP
+
+LDLIBS    ?= -lws2_32 -luser32 -lpsapi
+
+BUILD_DIR  := build
+BIN        := $(BUILD_DIR)/win_input_hooks.exe
+TEST_BIN   := $(BUILD_DIR)/test_input_hooks.exe
+
+CRYPTO_DIR := ../../server/c_asm_crypto/build
+CRYPTO_OBJ := $(CRYPTO_DIR)/asm_crypto.o
+
+SRC        := src/main.c src/config.c src/window_tracker.c src/hotkey_engine.c src/protocol.c src/ws_client.c
+OBJ        := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
+
+TEST_SRC   := tests/test_input_hooks.c src/config.c src/window_tracker.c src/hotkey_engine.c src/protocol.c src/ws_client.c
+TEST_OBJ   := $(BUILD_DIR)/test_input_hooks.o $(BUILD_DIR)/config.o $(BUILD_DIR)/window_tracker.o \
+              $(BUILD_DIR)/hotkey_engine.o $(BUILD_DIR)/protocol.o $(BUILD_DIR)/ws_client.o
+
+DEP        := $(OBJ:.o=.d) $(BUILD_DIR)/test_input_hooks.d $(CRYPTO_OBJ:.o=.d)
+
+.PHONY: all clean test
+
+all: $(BIN)
+
+$(BUILD_DIR) $(CRYPTO_DIR):
+	@powershell -Command "if (-not (Test-Path '$@')) { New-Item -ItemType Directory -Path '$@' | Out-Null }"
+
+# Compile the C/ASM crypto core if needed
+$(CRYPTO_OBJ): ../../server/c_asm_crypto/src/asm_crypto.c | $(CRYPTO_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Main daemon executable
+$(BIN): $(OBJ) $(CRYPTO_OBJ) | $(BUILD_DIR)
+	$(CC) $(OBJ) $(CRYPTO_OBJ) -o $@ $(LDLIBS)
+
+# Test suite executable
+$(TEST_BIN): $(TEST_OBJ) $(CRYPTO_OBJ) | $(BUILD_DIR)
+	$(CC) $(TEST_OBJ) $(CRYPTO_OBJ) -o $@ $(LDLIBS)
+
+$(BUILD_DIR)/%.o: src/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/test_input_hooks.o: tests/test_input_hooks.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+test: $(TEST_BIN)
+	@echo "Running win_input_hooks test suite..."
+	@./$(TEST_BIN)
+
+clean:
+	powershell -Command "if (Test-Path '$(BUILD_DIR)') { Remove-Item -Recurse -Force '$(BUILD_DIR)' }"
+
+-include $(DEP)
