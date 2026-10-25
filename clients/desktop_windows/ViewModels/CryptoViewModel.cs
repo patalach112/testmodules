@@ -60,13 +60,15 @@ namespace EcosystemClient
 
         public ClientSession Session => _session;
 
-        public ICommand TransformCommand { get; }
+        // Concrete command types (not ICommand): BenchmarkCommand's CanExecute is
+        // re-queried while a benchmark runs, which ICommand does not expose.
+        public RelayCommand TransformCommand { get; }
 
-        public ICommand SwapCommand { get; }
+        public RelayCommand SwapCommand { get; }
 
-        public ICommand SelfTestCommand { get; }
+        public AsyncRelayCommand SelfTestCommand { get; }
 
-        public ICommand BenchmarkCommand { get; }
+        public AsyncRelayCommand BenchmarkCommand { get; }
 
         /// <summary>Two-way bound to the session key; edits take effect on reconnect.</summary>
         public string KeyText

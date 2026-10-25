@@ -497,8 +497,13 @@ namespace EcosystemClient
 
         private void ConfigureSocket(ClientWebSocket socket)
         {
+            /*
+             * Only KeepAliveInterval is set here: it is available on every supported
+             * ClientWebSocketOptions surface, whereas a keep-alive *timeout* is not.
+             * The real response deadline is enforced by HealthPumpAsync, which tears
+             * the socket down when no inbound frame arrives within HealthTimeout.
+             */
             socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
-            socket.Options.KeepAliveTimeout = TimeSpan.FromSeconds(10);
 
             // The gateway terminates TLS at the Cloudflare edge; the client still
             // validates certificates for wss:// endpoints (the default). Nothing is
@@ -722,14 +727,7 @@ namespace EcosystemClient
                 int sequence = Interlocked.Increment(ref _probeSequence);
                 long sentAt = Stopwatch.GetTimestamp();
 
-                Span<byte> payload = probe.AsSpan();
-                payload[0] = ProbeMagic0;
-                payload[1] = ProbeMagic1;
-                payload[2] = ProbeMagic2;
-                payload[3] = ProbeMagic3;
-                BinaryPrimitives.WriteInt32LittleEndian(payload.Slice(4, 4), sequence);
-                BinaryPrimitives.WriteInt64LittleEndian(payload.Slice(8, 8), sentAt);
-                Random.Shared.NextBytes(payload.Slice(ProbeHeaderSize));
+                ReadOnlyMemory<byte> payload = BuildProbeFrame(probe, sequence, sentAt);
 
                 /*
                  * The probe travels as plaintext: the gateway XORs every frame it
@@ -739,6 +737,32 @@ namespace EcosystemClient
                 await SendRawAsync(socket, payload, WebSocketMessageType.Binary, cancellationToken).ConfigureAwait(false);
                 Interlocked.Increment(ref _probesSent);
             }
+        }
+
+        /// <summary>
+        /// Serialises a probe frame into <paramref name="buffer"/>.
+        ///
+        /// <para>Deliberately not part of the async pump: a <see cref="Span{T}"/> is a
+        /// ref struct and may not live in an async state machine (CS8652), and
+        /// <c>SendAsync</c> wants a <see cref="ReadOnlyMemory{T}"/> anyway. Working on
+        /// the pooled array here keeps the hot loop allocation-free.</para>
+        /// </summary>
+        private static ReadOnlyMemory<byte> BuildProbeFrame(byte[] buffer, int sequence, long sentAt)
+        {
+            Span<byte> payload = buffer.AsSpan();
+
+            payload[0] = ProbeMagic0;
+            payload[1] = ProbeMagic1;
+            payload[2] = ProbeMagic2;
+            payload[3] = ProbeMagic3;
+            BinaryPrimitives.WriteInt32LittleEndian(payload.Slice(4, 4), sequence);
+            BinaryPrimitives.WriteInt64LittleEndian(payload.Slice(8, 8), sentAt);
+
+            // Random filler: two probes never share a ciphertext, which keeps the
+            // transform honest and makes the frame useless to a passive observer.
+            Random.Shared.NextBytes(payload.Slice(ProbeHeaderSize));
+
+            return buffer;
         }
 
         private async Task HealthPumpAsync(CancellationToken cancellationToken)
