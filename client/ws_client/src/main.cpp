@@ -1,6 +1,8 @@
 #include "wsclient/ws_client.hpp"
 
 #include "asm_crypto.h"
+#include "binary_packer/opcodes.h"
+#include "binary_packer/packet.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -12,6 +14,7 @@
 #include <exception>
 #include <iostream>
 #include <iterator>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,6 +30,9 @@ struct CliArgs {
     // that are not legal UTF-8 text. --text forces the text opcode.
     bool binary = true;
     bool roundtrip = false;
+    // --packet wraps the message in the Binary Packet Protocol instead of
+    // sending it as a raw WebSocket frame.
+    bool use_packet = false;
     std::chrono::seconds timeout{10};
 };
 
@@ -37,6 +43,8 @@ void usage()
         << "options:\n"
         << "  --binary            send a binary frame (the default)\n"
         << "  --text              force a text frame instead\n"
+        << "  --packet            use the Binary Packet Protocol framing\n"
+        << "                      (12-byte header, CRC32-C, typed opcode)\n"
         << "  --count N           send N frames, verifying every reply\n"
         << "  --key DEC|0xHEX     asm_crypto key (default: 0x0123456789ABCDEF)\n"
         << "  --roundtrip         reverse the XOR on each reply and check it\n"
@@ -88,7 +96,7 @@ bool parse_url(const std::string &url, wsclient::ClientOptions &out)
     return !out.host.empty();
 }
 
-std::string hex_dump(const std::vector<std::uint8_t> &bytes)
+std::string hex_dump(std::span<const std::uint8_t> bytes)
 {
     static const char digits[] = "0123456789abcdef";
     std::string out;
@@ -98,6 +106,68 @@ std::string hex_dump(const std::vector<std::uint8_t> &bytes)
         out.push_back(digits[b & 0x0f]);
     }
     return out;
+}
+
+/*
+ * One BPP request/response: frame the payload, send it, validate the
+ * reply's checksum and sequence, and optionally prove the asm_crypto
+ * round trip. Returns false (after printing the reason) on any failure.
+ */
+bool exchange_packet(wsclient::Client &client, std::uint32_t sequence,
+                     const std::vector<std::uint8_t> &payload,
+                     std::uint64_t key, bool roundtrip, int frame_index)
+{
+    std::vector<std::uint8_t> frame(
+        binary_packer::packed_size(payload.size()));
+    binary_packer::PacketBuilder builder(frame);
+    if (builder.build(BP_OP_ECHO, 0, sequence, payload) != frame.size()) {
+        std::cerr << "error: packet builder rejected the payload\n";
+        return false;
+    }
+
+    const std::vector<std::uint8_t> reply = client.send(frame, true);
+    binary_packer::PacketParser parser(reply);
+    const bp_status_t status = parser.parse();
+    if (status != BP_OK) {
+        std::cerr << "FAIL frame " << frame_index
+                  << ": reply is not a valid packet (status " << status
+                  << ")\n";
+        return false;
+    }
+    if (parser.opcode() == BP_OP_ERROR) {
+        const auto body = parser.payload();
+        const unsigned code = body.empty() ? 0u : body[0];
+        std::cerr << "FAIL frame " << frame_index
+                  << ": gateway returned BP_OP_ERROR, status " << code
+                  << '\n';
+        return false;
+    }
+    if (parser.sequence() != sequence) {
+        std::cerr << "FAIL frame " << frame_index << ": sequence "
+                  << parser.sequence() << " != " << sequence << '\n';
+        return false;
+    }
+
+    const auto body = parser.payload();
+    if (roundtrip) {
+        std::vector<std::uint8_t> restored(body.size());
+        if (!body.empty())
+            asm_crypto_xor(body.data(), restored.data(), body.size(), key);
+        if (restored != payload) {
+            std::cerr << "FAIL frame " << frame_index
+                      << ": payload round trip mismatch\n";
+            return false;
+        }
+        std::cout << "frame " << frame_index << ": PASS (seq " << sequence
+                  << ", " << body.size() << " bytes transformed and "
+                     "restored, CRC32-C valid)\n";
+    } else {
+        std::cout << "frame " << frame_index << ": opcode 0x" << std::hex
+                  << static_cast<unsigned>(parser.opcode()) << std::dec
+                  << " seq " << sequence << " payload " << body.size()
+                  << " bytes 0x" << hex_dump(body) << '\n';
+    }
+    return true;
 }
 
 } // namespace
@@ -125,6 +195,8 @@ int main(int argc, char **argv)
             args.binary = true;
         } else if (flag == "--text") {
             args.binary = false;
+        } else if (flag == "--packet") {
+            args.use_packet = true;
         } else if (flag == "--roundtrip") {
             args.roundtrip = true;
         } else if (flag == "--count") {
@@ -183,6 +255,14 @@ int main(int argc, char **argv)
         std::cout << "connected to " << args.url << '\n';
 
         for (int frame = 1; frame <= args.count; ++frame) {
+            if (args.use_packet) {
+                if (!exchange_packet(client,
+                                     static_cast<std::uint32_t>(frame), payload,
+                                     args.key, args.roundtrip, frame))
+                    return 1;
+                continue;
+            }
+
             const std::vector<std::uint8_t> reply =
                 client.send(payload, args.binary);
 

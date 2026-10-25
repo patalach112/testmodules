@@ -1,6 +1,8 @@
 #ifndef GATEWAY_SESSION_HPP
 #define GATEWAY_SESSION_HPP
 
+#include "binary_packer/binary_pack.h"
+
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/core/tcp_stream.hpp>
 #include <boost/beast/websocket/stream.hpp>
@@ -19,9 +21,10 @@ namespace gateway {
  *     -> repeated async_read() / transform / async_write() loop
  *     -> close handshake or transport teardown on destruction
  *
- * Incoming frames are passed through the asm_crypto XOR transform and the
- * transformed bytes are echoed back, so the data path stays entirely in
- * process memory. The object keeps itself alive with shared_from_this()
+ * Incoming Binary Packet Protocol frames (see shared/binary_packer) are
+ * validated, their payload is run through the asm_crypto XOR transform and
+ * returned inside a freshly framed reply, so the data path stays entirely
+ * in process memory. The object keeps itself alive with shared_from_this()
  * until the last asynchronous operation completes.
  */
 class Session : public std::enable_shared_from_this<Session> {
@@ -42,6 +45,9 @@ private:
     void read();
     void on_read(boost::beast::error_code ec, std::size_t bytes_transferred);
     void on_write(boost::beast::error_code ec, std::size_t bytes_transferred);
+
+    // Frames a BP_OP_ERROR reply carrying the parser's status code.
+    void send_protocol_error(bp_status_t reason);
 
     WebSocket ws_;
     boost::beast::flat_buffer rx_;

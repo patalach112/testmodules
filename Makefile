@@ -10,10 +10,12 @@ ifeq ($(OS),Windows_NT)
 .PHONY: build clean test
 
 build:
+	$(MAKE) -C shared/binary_packer
 	$(MAKE) -C server/cpp_gateway
 	$(MAKE) -C client/ws_client
 
 clean:
+	$(MAKE) -C shared/binary_packer clean
 	$(MAKE) -C server/cpp_gateway clean
 	$(MAKE) -C client/ws_client clean
 
@@ -30,18 +32,21 @@ MARCH ?= -march=ivybridge -mtune=ivybridge
 .PHONY: build clean test
 
 build:
+	$(MAKE) -C shared/binary_packer MARCH='$(MARCH)'
 	$(MAKE) -C server/c_asm_crypto MARCH='$(MARCH)'
 	$(MAKE) -C server/cpp_gateway MARCH='$(MARCH)'
 	$(MAKE) -C client/ws_client MARCH='$(MARCH)'
 
 clean:
+	$(MAKE) -C shared/binary_packer clean
 	$(MAKE) -C server/c_asm_crypto clean
 	$(MAKE) -C server/cpp_gateway clean
 	$(MAKE) -C client/ws_client clean
 
-# Unit tests: builds everything, then runs the asm_crypto test suite
-# (all lengths and alignments, in-place and out-of-place, reference compared).
+# Unit tests: builds everything, then runs the asm_crypto and
+# binary_packer suites (reference vectors, corruption cases, alignments).
 test: build
+	$(MAKE) -C shared/binary_packer check
 	$(MAKE) -C server/c_asm_crypto check
 
 endif

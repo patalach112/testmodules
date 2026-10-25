@@ -1,12 +1,15 @@
 #include "gateway/session.hpp"
 
 #include "asm_crypto.h"
+#include "binary_packer/opcodes.h"
+#include "binary_packer/packet.hpp"
 #include "gateway/log.hpp"
 
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/dispatch.hpp>
 #include <chrono>
 #include <functional>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -72,15 +75,48 @@ void Session::on_read(beast::error_code ec, std::size_t /*bytes*/)
     }
 
     const std::size_t size = net::buffer_size(rx_.data());
-    tx_.resize(size);
+    const auto *wire = static_cast<const std::uint8_t *>(rx_.data().data());
 
-    // flat_buffer stores its readable area in one contiguous block, so the
-    // transform sees a plain pointer pair and never copies the frame twice.
-    asm_crypto_xor(rx_.data().data(), tx_.data(), size, crypto_key_);
+    // The parser only views the receive buffer; no bytes are copied.
+    binary_packer::PacketParser parser(wire, size);
+    if (parser.parse() != BP_OK) {
+        send_protocol_error(parser.status());
+        return;
+    }
 
-    // The transformed payload is arbitrary bytes, not guaranteed UTF-8:
-    // RFC 6455 only permits text frames whose payload is valid UTF-8, so
-    // every reply goes out as binary regardless of the incoming opcode.
+    const auto incoming = parser.payload();
+    tx_.resize(binary_packer::packed_size(incoming.size()));
+
+    // Reserve the full frame, then run the transform straight into the
+    // payload region: the only copy is the unavoidable transform write.
+    binary_packer::PacketBuilder builder(tx_);
+    std::uint8_t *outgoing = builder.begin_payload(
+        BP_OP_ECHO, parser.flags(), parser.sequence(),
+        static_cast<std::uint32_t>(incoming.size()));
+    if (outgoing == nullptr) {
+        send_protocol_error(BP_ERR_LENGTH);
+        return;
+    }
+    if (!incoming.empty())
+        asm_crypto_xor(incoming.data(), outgoing, incoming.size(),
+                       crypto_key_);
+    builder.finalize(static_cast<std::uint32_t>(incoming.size()));
+
+    // Framed binary on the wire; BPP payloads are arbitrary bytes.
+    ws_.binary(true);
+    ws_.async_write(net::buffer(tx_),
+                    std::bind_front(&Session::on_write, shared_from_this()));
+}
+
+void Session::send_protocol_error(bp_status_t reason)
+{
+    Logger::warn("malformed packet, status " + std::to_string(reason));
+
+    const std::uint8_t status = static_cast<std::uint8_t>(reason);
+    tx_.resize(binary_packer::packed_size(1));
+    binary_packer::PacketBuilder builder(tx_);
+    builder.build(BP_OP_ERROR, 0, 0, std::span<const std::uint8_t>(&status, 1));
+
     ws_.binary(true);
     ws_.async_write(net::buffer(tx_),
                     std::bind_front(&Session::on_write, shared_from_this()));

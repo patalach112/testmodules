@@ -25,9 +25,12 @@ if [ ! -d "/mingw64/include/boost/beast" ]; then
     exit 1
 fi
 
-# OS=Windows_NT makes the component Makefile include Makefile.win.
-make -C server/cpp_gateway clean
-make -C server/cpp_gateway
+# OS=Windows_NT makes every component Makefile include its Makefile.win.
+# The root build covers the packer objects, gateway.exe and ws_client.exe.
+make clean
+make
 
 echo
-echo "built: server/cpp_gateway/build/gateway.exe"
+echo "built:"
+echo "  server/cpp_gateway/build/gateway.exe"
+echo "  client/ws_client/build/ws_client.exe"
