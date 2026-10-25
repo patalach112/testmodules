@@ -7,7 +7,7 @@ Cloudflare Tunnel, backed by a C/assembly core library.
 ## Architecture
 
 ```
-client (Windows / iOS / Android)
+client (Windows desktop / iOS / Android)
         │  WSS (HTTPS + WebSocket, TLS at the edge)
         ▼
 Cloudflare edge ── outbound tunnel ──► cloudflared (container, no inbound ports)
@@ -242,6 +242,37 @@ Run it the same way, from the MINGW64 shell:
 ```sh
 GATEWAY_PORT=8080 ASM_CRYPTO_KEY=0x0123456789ABCDEF ./build/gateway.exe
 ```
+
+## Windows desktop client (C# / WPF)
+
+`clients/desktop_windows` is the native Windows client: a borderless,
+custom-chromed dashboard (dark cyberpunk theme) that speaks WSS to the gateway,
+decodes inbound frames with the same C/ASM core, and shows live latency,
+throughput, packet and crypto counters plus a wire-level terminal.
+
+```powershell
+cd clients\desktop_windows
+
+# PowerShell: builds asm_crypto.dll from ../../server/c_asm_crypto, then the app,
+# and stages the DLL next to the executable
+powershell -ExecutionPolicy Bypass -File .\build.ps1
+
+# or in an MSYS2 / MINGW64 shell
+make            # native DLL + WPF app
+make run        # launch
+make publish    # bin/Release/net8.0-windows/win-x64/publish
+```
+
+Requirements: Windows 10 1809+ and the .NET 8 SDK; MinGW-w64 gcc is optional
+(without it the client runs on a bit-identical managed fallback and says so in
+the UI). The native library is resolved from the application directory,
+`native/`, `runtimes/win-x64/native/` or `%ECOSYSTEM_CRYPTO_LIBRARY%` — never
+from the current working directory.
+
+Protocol note: the gateway XORs every echoed frame, so the client sends plaintext
+and decodes inbound frames with the shared key. `ASM_CRYPTO_KEY` must therefore
+match on both sides. See `clients/desktop_windows/README.md` for the architecture,
+threading model, latency-probe frame layout and performance modes.
 
 ## Docker
 
